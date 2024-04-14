@@ -1,6 +1,8 @@
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -27,7 +29,8 @@ public class FPSController : MonoBehaviour
     List<Gun> equippedGuns = new List<Gun>();
     int gunIndex = 0;
     Gun currentGun = null;
-    Vector2 movement = new Vector2();
+    bool autoFiring;
+    bool sprinting;
 
     // properties
     public GameObject Cam { get { return cam; } }
@@ -42,12 +45,25 @@ public class FPSController : MonoBehaviour
     {
         InputManager.controls.Enable();
         InputManager.controls.Player.Jump.performed += Jump;
+        InputManager.controls.Player.SwitchGun.performed += SwitchGun;
+        InputManager.controls.Player.FireGun.performed += FireGun;
+        InputManager.controls.Player.FireGun.canceled += FireGunCanceled;
+        InputManager.controls.Player.Sprint.performed += Sprint;
+        InputManager.controls.Player.Sprint.canceled += SprintCanceled;
+
     }
+
+
 
     private void OnDisable()
     {
         InputManager.controls.Disable();
         InputManager.controls.Player.Jump.performed -= Jump;
+        InputManager.controls.Player.SwitchGun.performed -= SwitchGun;
+        InputManager.controls.Player.FireGun.performed -= FireGun;
+        InputManager.controls.Player.FireGun.canceled -= FireGunCanceled;
+        InputManager.controls.Player.Sprint.performed -= Sprint;
+        InputManager.controls.Player.Sprint.canceled -= SprintCanceled;
     }
 
     // Start is called before the first frame update
@@ -61,8 +77,6 @@ public class FPSController : MonoBehaviour
             AddGun(initialGun);
 
         origin = transform.position;
-
-        
     }
 
     // Update is called once per frame
@@ -71,20 +85,12 @@ public class FPSController : MonoBehaviour
         grounded = controller.isGrounded;
         Movement();
         Look();
-        HandleSwitchGun();
-        FireGun();
-
-        movement = InputManager.controls.Player.Movement.ReadValue<Vector2>();
+        FireAutomaticGun();
 
         // always go back to "no velocity"
         // "velocity" is for movement speed that we gain in addition to our movement (falling, knockback, etc.)
         Vector3 noVelocity = new Vector3(0, velocity.y, 0);
         velocity = Vector3.Lerp(velocity, noVelocity, 5 * Time.deltaTime);
-    }
-
-    private void FixedUpdate()
-    {
-        //Movement();
     }
 
     /*void OldMovement()
@@ -110,7 +116,7 @@ public class FPSController : MonoBehaviour
         controller.Move(velocity * Time.deltaTime);
     }*/
 
-    void Look()
+    /*void OldLook()
     {
         Vector2 looking = GetPlayerLook();
         float lookX = looking.x * lookSensitivityX * Time.deltaTime;
@@ -122,9 +128,9 @@ public class FPSController : MonoBehaviour
         cam.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
         transform.Rotate(Vector3.up * lookX);
-    }
+    }*/
 
-    void HandleSwitchGun()
+    /*void HandleSwitchGun()
     {
         if (equippedGuns.Count == 0)
             return;
@@ -146,9 +152,9 @@ public class FPSController : MonoBehaviour
 
             EquipGun(equippedGuns[gunIndex]);
         }
-    }
+    }*/
 
-    void FireGun()
+    /*void OldFireGun()
     {
         // don't fire if we don't have a gun
         if (currentGun == null)
@@ -172,7 +178,7 @@ public class FPSController : MonoBehaviour
         {
             currentGun?.AttemptAltFire();
         }
-    }
+    }*/
 
     void EquipGun(Gun g)
     {
@@ -215,19 +221,15 @@ public class FPSController : MonoBehaviour
 
     // Input methods
 
-    bool GetPressFire()
+    /*bool GetPressFire()
     {
-        return Input.GetButtonDown("Fire1");
+        return InputManager.controls.Player.SwitchGun.ReadValue<float>() > 0;
     }
 
-    bool GetHoldFire()
-    {
-        return Input.GetButton("Fire1");
-    }
 
     bool GetPressAltFire()
     {
-        return Input.GetButtonDown("Fire2");
+        return InputManager.controls.Player.SwitchGun.ReadValue<float>() < 0;
     }
 
     Vector2 GetPlayerMovementVector()
@@ -235,14 +237,18 @@ public class FPSController : MonoBehaviour
         return new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
     }
 
-    Vector2 GetPlayerLook()
+    /*Vector2 GetPlayerLook()
     {
         return new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+    }*/
+    public bool GetHoldFire()
+    {
+        return autoFiring;
     }
 
     bool GetSprint()
     {
-        return Input.GetButton("Sprint");
+        return sprinting;
     }
 
     // Collision methods
@@ -263,10 +269,50 @@ public class FPSController : MonoBehaviour
         }
     }
 
+    //New Input Functions
+
     public void Jump(InputAction.CallbackContext ctx)
     {
         if (grounded)
             velocity.y += Mathf.Sqrt(jumpForce * -1 * gravity);
+    }
+
+    public void Look()
+    {
+        Vector2 looking = InputManager.controls.Player.Look.ReadValue<Vector2>();
+        float lookX = looking.x * lookSensitivityX * Time.deltaTime;
+        float lookY = looking.y * lookSensitivityY * Time.deltaTime;
+
+        xRotation -= lookY;
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+        cam.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+        transform.Rotate(Vector3.up * lookX);
+    }
+
+    public void SwitchGun(InputAction.CallbackContext ctx)
+    {
+        if (equippedGuns.Count == 0)
+            return;
+
+        if (InputManager.controls.Player.SwitchGun.ReadValue<float>() > 0)
+        {
+            gunIndex++;
+            if (gunIndex > equippedGuns.Count - 1)
+                gunIndex = 0;
+
+            EquipGun(equippedGuns[gunIndex]);
+        }
+
+        else if (InputManager.controls.Player.SwitchGun.ReadValue<float>() < 0)
+        {
+            gunIndex--;
+            if (gunIndex < 0)
+                gunIndex = equippedGuns.Count - 1;
+
+            EquipGun(equippedGuns[gunIndex]);
+        }
     }
 
     public void Movement()
@@ -276,11 +322,59 @@ public class FPSController : MonoBehaviour
             velocity.y = -1;// -0.5f;
         }
 
+        Vector2 movement = InputManager.controls.Player.Movement.ReadValue<Vector2>();
         Vector3 move = transform.right * movement.x + transform.forward * movement.y;
         controller.Move(move * movementSpeed * (GetSprint() ? 2 : 1) * Time.deltaTime);
 
         velocity.y += gravity * Time.deltaTime;
 
         controller.Move(velocity * Time.deltaTime);
+    }
+
+    public void FireGun(InputAction.CallbackContext ctx)
+    {
+        autoFiring = true;
+        // don't fire if we don't have a gun
+        if (currentGun == null)
+            return;
+
+
+        // pressed the fire button
+        currentGun?.AttemptFire();
+
+    }
+
+    public void FireAutomaticGun()
+    {
+        if (GetHoldFire())
+        {
+            if (currentGun == null)
+                return;
+            if (currentGun.AttemptAutomaticFire())
+                currentGun?.AttemptFire();
+        }
+    }
+
+    public void AltFireGun(InputAction.CallbackContext ctx)
+    {
+        // don't fire if we don't have a gun
+        if (currentGun == null)
+            return;
+        currentGun?.AttemptAltFire();
+    }
+
+    private void FireGunCanceled(InputAction.CallbackContext context)
+    {
+        autoFiring = false;
+    }
+
+
+    private void Sprint(InputAction.CallbackContext context)
+    {
+        sprinting = true;
+    }
+    private void SprintCanceled(InputAction.CallbackContext context)
+    {
+        sprinting = false;
     }
 }
