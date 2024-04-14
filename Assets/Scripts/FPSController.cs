@@ -1,6 +1,8 @@
+using Newtonsoft.Json.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class FPSController : MonoBehaviour
 {
@@ -25,6 +27,7 @@ public class FPSController : MonoBehaviour
     List<Gun> equippedGuns = new List<Gun>();
     int gunIndex = 0;
     Gun currentGun = null;
+    Vector2 movement = new Vector2();
 
     // properties
     public GameObject Cam { get { return cam; } }
@@ -33,6 +36,18 @@ public class FPSController : MonoBehaviour
     private void Awake()
     {
         
+    }
+
+    private void OnEnable()
+    {
+        InputManager.controls.Enable();
+        InputManager.controls.Player.Jump.performed += Jump;
+    }
+
+    private void OnDisable()
+    {
+        InputManager.controls.Disable();
+        InputManager.controls.Player.Jump.performed -= Jump;
     }
 
     // Start is called before the first frame update
@@ -46,15 +61,20 @@ public class FPSController : MonoBehaviour
             AddGun(initialGun);
 
         origin = transform.position;
+
+        
     }
 
     // Update is called once per frame
     void Update()
     {
+        grounded = controller.isGrounded;
         Movement();
         Look();
         HandleSwitchGun();
         FireGun();
+
+        movement = InputManager.controls.Player.Movement.ReadValue<Vector2>();
 
         // always go back to "no velocity"
         // "velocity" is for movement speed that we gain in addition to our movement (falling, knockback, etc.)
@@ -62,11 +82,16 @@ public class FPSController : MonoBehaviour
         velocity = Vector3.Lerp(velocity, noVelocity, 5 * Time.deltaTime);
     }
 
-    void Movement()
+    private void FixedUpdate()
+    {
+        //Movement();
+    }
+
+    /*void OldMovement()
     {
         grounded = controller.isGrounded;
 
-        if(grounded && velocity.y < 0)
+        if (grounded && velocity.y < 0)
         {
             velocity.y = -1;// -0.5f;
         }
@@ -83,7 +108,7 @@ public class FPSController : MonoBehaviour
         velocity.y += gravity * Time.deltaTime;
 
         controller.Move(velocity * Time.deltaTime);
-    }
+    }*/
 
     void Look()
     {
@@ -238,5 +263,24 @@ public class FPSController : MonoBehaviour
         }
     }
 
+    public void Jump(InputAction.CallbackContext ctx)
+    {
+        if (grounded)
+            velocity.y += Mathf.Sqrt(jumpForce * -1 * gravity);
+    }
 
+    public void Movement()
+    {
+        if (grounded && velocity.y < 0)
+        {
+            velocity.y = -1;// -0.5f;
+        }
+
+        Vector3 move = transform.right * movement.x + transform.forward * movement.y;
+        controller.Move(move * movementSpeed * (GetSprint() ? 2 : 1) * Time.deltaTime);
+
+        velocity.y += gravity * Time.deltaTime;
+
+        controller.Move(velocity * Time.deltaTime);
+    }
 }
