@@ -28,7 +28,7 @@ public class FPSController : MonoBehaviour
     float xRotation;
     List<Gun> equippedGuns = new List<Gun>();
     int gunIndex = 0;
-    Gun currentGun = null;
+    public Gun currentGun = null;
     bool autoFiring;
     bool sprinting;
 
@@ -180,7 +180,7 @@ public class FPSController : MonoBehaviour
         }
     }*/
 
-    void EquipGun(Gun g)
+    public void EquipGun(Gun g)
     {
         // disable current gun, if there is one
         currentGun?.Unequip();

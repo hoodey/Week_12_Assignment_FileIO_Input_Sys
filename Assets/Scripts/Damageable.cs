@@ -22,6 +22,16 @@ public class Damageable : MonoBehaviour
         currentHp = maxHp;
     }
 
+    public float GetHP()
+    {
+        return currentHp;
+    }
+
+    public void SetHP(float hp)
+    {
+        currentHp = hp;
+    }
+
     public void Hit(Vector3 knockback, float damageAmount)
     {
         //owner.ApplyKnockback(knockback);
